@@ -22,15 +22,71 @@ Shift Baru: F
 1. `main.dart`
    - `MyApp` menggunakan `MaterialApp` untuk mengatur tema, navigasi, dan halaman awal (`LoginPage`).  
    - Aplikasi akan mengarahkan user ke halaman login. Jika belum memiliki akun, user bisa menekan tombol register.  
-
+     ```dart
+      import 'package:flutter/material.dart';
+      import 'package:tokokita/ui/login_page.dart';
+      
+      void main() {
+        runApp(const MyApp());
+      }
+      
+      class MyApp extends StatelessWidget {
+        const MyApp({Key? key}) : super(key: key);
+      
+        @override
+        Widget build(BuildContext context) {
+          return const MaterialApp(
+            title: 'Toko Kita Fauzia',
+            debugShowCheckedModeBanner: false,
+            home: LoginPage(),
+          );
+        }
+      }
+     ```
 ---
 
 2. Halaman Login (`login_page.dart`)
    - Input email & password menggunakan `TextEditingController`.  
    - Validasi:
      - Email tidak boleh kosong.  
-     - Password tidak boleh kosong.  
-   - Saat login, memanggil `LoginBloc.login(...)` untuk request ke API.  
+     - Password tidak boleh kosong.
+        ```dart
+         final _formKey = GlobalKey<FormState>();
+         final _emailTextboxController = TextEditingController();
+         final _passwordTextboxController = TextEditingController();
+        ```
+   - Saat login, memanggil `LoginBloc.login(...)` untuk request ke API.
+     ```dart
+      void _submit() {
+        _formKey.currentState!.save();
+        setState(() { _isLoading = true; });
+      
+        LoginBloc.login(
+          email: _emailTextboxController.text,
+          password: _passwordTextboxController.text,
+        ).then((value) async {
+          if (value.code == 200) {
+            await UserInfo().setToken(value.token.toString());
+            await UserInfo().setUserID(int.parse(value.userID.toString()));
+      
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (context) => const ProdukPage()),
+            );
+          } else {
+            showDialog(
+              context: context,
+              barrierDismissible: false,
+              builder: (BuildContext context) => const WarningDialog(
+                description: "Login gagal, silahkan coba lagi",
+              ),
+            );
+          }
+        }).whenComplete(() {
+          setState(() { _isLoading = false; });
+        });
+      }
+     ```
    - Jika berhasil: simpan token & userID di local storage lalu diarahkan ke `ProdukPage`.  
    - Jika gagal akan ditampilkan `WarningDialog`.  
 
@@ -41,8 +97,44 @@ Shift Baru: F
    - Validasi input:
      - Nama minimal 3 karakter.  
      - Email sesuai format.  
-     - Password minimal 6 karakter & konfirmasi harus sama.  
-   - Fungsi `_submit()` memanggil `RegistrasiBloc.registrasi()`.  
+     - Password minimal 6 karakter & konfirmasi harus sama.
+       ```dart
+         validator: (value) {
+           if (value == null || value.isEmpty) return "Nama harus diisi";
+           if (value.length < 3) return "Nama harus minimal 3 karakter";
+           return null;
+         }
+       ``` 
+   - Fungsi `_submit()` memanggil `RegistrasiBloc.registrasi()`.
+     ```dart
+         void _submit() {
+           _formKey.currentState!.save();
+           setState(() { _isLoading = true; });
+         
+           RegistrasiBloc.registrasi(
+             nama: _namaTextboxController.text,
+             email: _emailTextboxController.text,
+             password: _passwordTextboxController.text,
+           ).then((value) {
+             showDialog(
+               context: context,
+               barrierDismissible: false,
+               builder: (BuildContext context) => SuccessDialog(
+                 description: "Registrasi berhasil, silahkan login",
+                 okClick: () { Navigator.pop(context); },
+               ),
+             );
+           }, onError: (error) {
+             showDialog(
+               context: context,
+               barrierDismissible: false,
+               builder: (BuildContext context) => const WarningDialog(
+                 description: "Registrasi gagal, silahkan coba lagi",
+               ),
+             );
+           }).whenComplete(() { setState(() { _isLoading = false; }); });
+         }
+     ```
    - Jika berhasil: tampilkan `SuccessDialog` dan akan diarahkan ke halaman login.  
    - Jika gagal akan ditampilkan `WarningDialog`.  
 
@@ -72,7 +164,14 @@ Shift Baru: F
      - Tanggal Masuk harus diisi.  
      - Volume harus diisi.  
      - Penulis harus diisi.
-     - Penerbit harus diisi.  
+     - Penerbit harus diisi.
+     - Contoh:
+       ```dart
+         validator: (value) {
+           if (value == null || value.isEmpty) return "Judul harus diisi";
+           return null;
+         }
+       ```
    - Tombol Simpan/Ubah menyesuaikan mode form:  
      ```dart
      if (widget.produk != null) {
@@ -89,10 +188,30 @@ Shift Baru: F
    - Menampilkan detail buku di tengah halaman (`Center` + `Column`).  
    - Tombol Edit membuka halaman `ProdukForm` dengan data buku terisi.  
    - Jika menekan tombol delete, maka akan muncul popup konfirmasi hapus:
-     - Jika "Ya" dilakukan penghapusan denganm memanggil `ProdukBloc.deleteProduk(id)` lalu kembali ke `ProdukPage`.  
+     ```dart
+      AlertDialog(
+        content: const Text("Yakin ingin menghapus data ini?"),
+        actions: [
+          OutlinedButton(
+            child: const Text("Ya"),
+            onPressed: () {
+              ProdukBloc.deleteProduk(id: int.parse(widget.produk!.id!)).then(
+                (value) => Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(builder: (_) => const ProdukPage()),
+                ),
+              );
+            },
+          ),
+          OutlinedButton(child: const Text("Batal"), onPressed: () => Navigator.pop(context)),
+        ],
+      )
+     ```
+     - Jika "Ya" dilakukan penghapusan dengan memanggil `ProdukBloc.deleteProduk(id)` lalu kembali ke `ProdukPage`.  
      - Jika Batal, maka dialog akan ditutup.  
 
 ---
 
 ## 🎥 Demo Aplikasi
 https://github.com/user-attachments/assets/ff568c86-8f39-4bad-8a90-c2b9aa2c8a63
+
